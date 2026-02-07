@@ -18,7 +18,7 @@ export function Hero() {
           teams who value technical precision.
         </p>
       </div>
-      <div className="flex flex-wrap items-center gap-4 pt-2">
+      <div className="relative z-10 flex flex-wrap items-center gap-4 pt-2">
         <Link
           href="/contact"
           className="inline-flex items-center justify-center rounded-full bg-[var(--accent)] px-6 py-3 text-sm font-medium tracking-wide text-white shadow-sm transition-all hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2"
@@ -32,7 +32,7 @@ export function Hero() {
           View Services
         </Link>
       </div>
-      <div className="flex flex-wrap items-center gap-6 pt-2 text-xs text-muted-foreground">
+      <div className="relative z-10 flex flex-wrap items-center gap-6 pt-2 text-xs text-muted-foreground">
         <div>
           <span className="font-mono text-[11px] uppercase tracking-[0.18em]">
             Stack

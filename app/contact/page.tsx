@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { PageTransition } from "@/components/site/PageTransition";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { Input } from "@/components/ui/Input";
@@ -32,12 +32,57 @@ const budgetRanges = [
 export default function ContactPage() {
   const [projectType, setProjectType] = useState("");
   const [budgetRange, setBudgetRange] = useState("");
-  const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
+  const [errorMessage, setErrorMessage] = useState("");
+  const formRef = useRef<HTMLFormElement>(null);
+  const clientTsRef = useRef(Date.now());
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setSubmitted(true);
-    setTimeout(() => setSubmitted(false), 4000);
+    setSubmitting(true);
+    setStatus("idle");
+    setErrorMessage("");
+
+    const formData = new FormData(e.currentTarget);
+    const payload = {
+      name: formData.get("name") as string,
+      email: formData.get("email") as string,
+      projectType,
+      budgetRange,
+      message: formData.get("message") as string,
+      company: formData.get("company") as string,
+      website: formData.get("website") as string,
+      hp: formData.get("hp") as string,
+      clientTs: clientTsRef.current,
+    };
+
+    try {
+      const response = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await response.json();
+
+      if (result.ok) {
+        setStatus("success");
+        formRef.current?.reset();
+        setProjectType("");
+        setBudgetRange("");
+        clientTsRef.current = Date.now();
+      } else {
+        setStatus("error");
+        setErrorMessage(result.error || "Failed to send message");
+      }
+    } catch (error) {
+      setStatus("error");
+      setErrorMessage("Network error. Please try again.");
+      console.error("Form submission error:", error);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -71,7 +116,7 @@ export default function ContactPage() {
           </div>
         </div>
         <div className="surface p-6 space-y-4">
-          <form className="space-y-4" onSubmit={handleSubmit}>
+          <form ref={formRef} className="space-y-4" onSubmit={handleSubmit}>
             <div className="grid gap-4 md:grid-cols-2">
               <Input label="Name" name="name" placeholder="Jane Doe" required />
               <Input
@@ -82,6 +127,19 @@ export default function ContactPage() {
                 required
               />
             </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <Input label="Company (optional)" name="company" placeholder="ACME Inc" />
+              <Input label="Website (optional)" name="website" placeholder="https://..." />
+            </div>
+            {/* Honeypot field - hidden from users */}
+            <input
+              type="text"
+              name="hp"
+              tabIndex={-1}
+              autoComplete="off"
+              className="sr-only absolute -left-[9999px]"
+              aria-hidden="true"
+            />
             <ChipGroup
               label="Project Type"
               options={projectTypes}
@@ -106,14 +164,23 @@ export default function ContactPage() {
               required
             />
             <div className="pt-2">
-              <Button type="submit">Submit brief</Button>
+              <Button type="submit" disabled={submitting}>
+                {submitting ? "Sending..." : "Submit brief"}
+              </Button>
             </div>
-            {submitted && (
-              <div className="rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/5 px-4 py-3 text-sm">
-                <p className="font-medium text-black">Demo mode</p>
+            {status === "success" && (
+              <div className="rounded-lg border border-green-500/30 bg-green-500/5 px-4 py-3 text-sm">
+                <p className="font-medium text-[var(--text)]">Message sent successfully!</p>
                 <p className="text-muted-foreground text-xs mt-1">
-                  Form submission not implemented yet. In production, this would
-                  send to your backend or email service.
+                  We&apos;ll review your brief and reply within 1–2 business days.
+                </p>
+              </div>
+            )}
+            {status === "error" && (
+              <div className="rounded-lg border border-red-500/30 bg-red-500/5 px-4 py-3 text-sm">
+                <p className="font-medium text-[var(--text)]">Failed to send message</p>
+                <p className="text-muted-foreground text-xs mt-1">
+                  {errorMessage || "Please try again or email us directly at contact@awere.se"}
                 </p>
               </div>
             )}

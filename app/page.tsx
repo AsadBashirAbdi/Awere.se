@@ -6,6 +6,7 @@ import { ProcessSteps } from "@/components/sections/ProcessSteps";
 import { ContactCTA } from "@/components/sections/ContactCTA";
 import { SystemPreview } from "@/components/sections/SystemPreview";
 import { PageTransition } from "@/components/site/PageTransition";
+import { Reveal } from "@/components/site/Reveal";
 
 export const metadata: Metadata = {
   title: "AWERE — We build systems, not just websites.",
@@ -21,10 +22,18 @@ export default function HomePage() {
           <Hero />
           <SystemPreview />
         </section>
-        <ServicesGrid />
-        <WorkGrid />
-        <ProcessSteps />
-        <ContactCTA />
+        <Reveal id="services-home">
+          <ServicesGrid />
+        </Reveal>
+        <Reveal id="work-home">
+          <WorkGrid />
+        </Reveal>
+        <Reveal id="process-home">
+          <ProcessSteps />
+        </Reveal>
+        <Reveal id="cta-home">
+          <ContactCTA />
+        </Reveal>
       </div>
     </PageTransition>
   );
