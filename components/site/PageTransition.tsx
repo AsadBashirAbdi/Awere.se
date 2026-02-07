@@ -3,23 +3,13 @@
 import { motion } from "framer-motion";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
-
-const transition = {
-  duration: 0.3,
-  ease: [0.25, 1, 0.5, 1],
-} as const;
+import { pageTransition } from "@/lib/motion";
 
 export function PageTransition({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
   return (
-    <motion.div
-      key={pathname}
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: 10 }}
-      transition={transition}
-    >
+    <motion.div key={pathname} {...pageTransition}>
       {children}
     </motion.div>
   );

@@ -1,6 +1,8 @@
+"use client";
+
 import { getServices } from "@/lib/content";
 import { Card } from "@/components/ui/Card";
-import { Checklist } from "@/components/ui/Checklist";
+import { InteractiveChecklist } from "@/components/ui/InteractiveChecklist";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 
 export function ServicesGrid() {
@@ -25,9 +27,11 @@ export function ServicesGrid() {
                 {service.description}
               </p>
             </div>
-            <Checklist
+            <InteractiveChecklist
               title="Deliverables checklist"
               items={service.deliverables.map((d) => ({ label: d }))}
+              persistKey={service.id}
+              showProgress
             />
           </Card>
         ))}
