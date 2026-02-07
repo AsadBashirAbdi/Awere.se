@@ -1,30 +1,52 @@
-import { Resend } from "resend";
+import nodemailer from "nodemailer";
 import { NextResponse } from "next/server";
 
-let resendInstance: Resend | null = null;
+// Rate limiting (in-memory, best-effort on serverless)
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT_MAX = 5;
+const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
 
-function getResend() {
-  if (!resendInstance) {
-    resendInstance = new Resend(process.env.RESEND_API_KEY);
-  }
-  return resendInstance;
+function getRateLimitKey(request: Request): string {
+  const forwarded = request.headers.get("x-forwarded-for");
+  const ip = forwarded ? forwarded.split(",")[0].trim() : "unknown";
+  return ip;
 }
 
-const CONTACT_TO_EMAIL = process.env.CONTACT_TO_EMAIL || "contact@awere.se";
-const CONTACT_FROM_EMAIL =
-  process.env.CONTACT_FROM_EMAIL || "hello@awere.se";
-const CONTACT_SUBJECT_PREFIX = process.env.CONTACT_SUBJECT_PREFIX || "AWERE";
+function checkRateLimit(key: string): boolean {
+  const now = Date.now();
+  const record = rateLimitMap.get(key);
+
+  if (!record || now > record.resetAt) {
+    rateLimitMap.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return true;
+  }
+
+  if (record.count >= RATE_LIMIT_MAX) {
+    return false;
+  }
+
+  record.count++;
+  return true;
+}
+
+// Clean up old entries periodically (simple garbage collection)
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, record] of rateLimitMap.entries()) {
+    if (now > record.resetAt) {
+      rateLimitMap.delete(key);
+    }
+  }
+}, 5 * 60 * 1000); // Every 5 minutes
 
 type ContactPayload = {
   name: string;
   email: string;
+  message: string;
   projectType?: string;
   budgetRange?: string;
-  message: string;
   company?: string;
   website?: string;
-  hp?: string;
-  clientTs?: number;
 };
 
 function validatePayload(data: unknown): {
@@ -38,33 +60,14 @@ function validatePayload(data: unknown): {
 
   const payload = data as Partial<ContactPayload>;
 
-  // Honeypot check
-  if (payload.hp && payload.hp.trim() !== "") {
-    // Silent drop (return success to avoid spam probing)
-    return { valid: false, error: "spam" };
-  }
-
-  // Timing check
-  if (payload.clientTs) {
-    const now = Date.now();
-    const diff = now - payload.clientTs;
-    const maxAge = 24 * 60 * 60 * 1000; // 24 hours
-    const minAge = 2000; // 2 seconds
-
-    if (diff > maxAge || diff < minAge) {
-      // Silent drop
-      return { valid: false, error: "spam" };
-    }
-  }
-
   // Required fields
   if (
     !payload.name ||
     typeof payload.name !== "string" ||
-    payload.name.length < 2 ||
-    payload.name.length > 80
+    payload.name.trim().length < 2 ||
+    payload.name.length > 120
   ) {
-    return { valid: false, error: "Invalid name (2-80 characters required)" };
+    return { valid: false, error: "Invalid name (2-120 characters required)" };
   }
 
   if (
@@ -72,7 +75,7 @@ function validatePayload(data: unknown): {
     typeof payload.email !== "string" ||
     !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email) ||
     payload.email.length < 5 ||
-    payload.email.length > 120
+    payload.email.length > 254
   ) {
     return { valid: false, error: "Invalid email address" };
   }
@@ -80,7 +83,7 @@ function validatePayload(data: unknown): {
   if (
     !payload.message ||
     typeof payload.message !== "string" ||
-    payload.message.length < 20 ||
+    payload.message.trim().length < 20 ||
     payload.message.length > 4000
   ) {
     return {
@@ -89,61 +92,35 @@ function validatePayload(data: unknown): {
     };
   }
 
-  // Optional fields
-  if (
-    payload.projectType &&
-    (typeof payload.projectType !== "string" || payload.projectType.length > 60)
-  ) {
-    return { valid: false, error: "Invalid project type" };
-  }
-
-  if (
-    payload.budgetRange &&
-    (typeof payload.budgetRange !== "string" || payload.budgetRange.length > 60)
-  ) {
-    return { valid: false, error: "Invalid budget range" };
-  }
-
-  if (
-    payload.company &&
-    (typeof payload.company !== "string" || payload.company.length > 120)
-  ) {
-    return { valid: false, error: "Invalid company" };
-  }
-
-  if (
-    payload.website &&
-    (typeof payload.website !== "string" || payload.website.length > 200)
-  ) {
-    return { valid: false, error: "Invalid website" };
-  }
-
   return {
     valid: true,
     payload: {
-      name: payload.name,
-      email: payload.email,
-      message: payload.message,
+      name: payload.name.trim(),
+      email: payload.email.trim(),
+      message: payload.message.trim(),
       projectType: payload.projectType,
       budgetRange: payload.budgetRange,
       company: payload.company,
       website: payload.website,
-      hp: payload.hp,
-      clientTs: payload.clientTs,
     },
   };
 }
 
 export async function POST(request: Request) {
   try {
+    // Rate limiting
+    const rateLimitKey = getRateLimitKey(request);
+    if (!checkRateLimit(rateLimitKey)) {
+      return NextResponse.json(
+        { ok: false, error: "Too many requests. Please try again later." },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json();
     const validation = validatePayload(body);
 
     if (!validation.valid) {
-      // Silent drop for spam
-      if (validation.error === "spam") {
-        return NextResponse.json({ ok: true });
-      }
       return NextResponse.json(
         { ok: false, error: validation.error },
         { status: 400 }
@@ -151,6 +128,35 @@ export async function POST(request: Request) {
     }
 
     const payload = validation.payload!;
+
+    // Environment variables
+    const SMTP_HOST = process.env.SMTP_HOST || "mailcluster.loopia.se";
+    const SMTP_PORT = parseInt(process.env.SMTP_PORT || "465", 10);
+    const SMTP_USER = process.env.SMTP_USER || process.env.CONTACT_FROM_EMAIL;
+    const SMTP_PASS = process.env.SMTP_PASS;
+    const CONTACT_FROM_EMAIL = process.env.CONTACT_FROM_EMAIL;
+    const CONTACT_TO_EMAIL = process.env.CONTACT_TO_EMAIL;
+
+    if (!SMTP_USER || !SMTP_PASS || !CONTACT_FROM_EMAIL || !CONTACT_TO_EMAIL) {
+      console.error("Missing required SMTP environment variables");
+      return NextResponse.json(
+        { ok: false, error: "Email service not configured" },
+        { status: 500 }
+      );
+    }
+
+    // Create transporter
+    const transporter = nodemailer.createTransport({
+      host: SMTP_HOST,
+      port: SMTP_PORT,
+      secure: SMTP_PORT === 465, // true for 465, false for 587
+      auth: {
+        user: SMTP_USER,
+        pass: SMTP_PASS,
+      },
+      logger: false, // Don't log credentials
+      debug: false,
+    });
 
     // Build email body
     const textBody = `
@@ -172,29 +178,21 @@ Sent via awere.se/contact
 Timestamp: ${new Date().toISOString()}
 `.trim();
 
-    const subject = `${CONTACT_SUBJECT_PREFIX}: ${payload.projectType || "New inquiry"} — ${payload.name}`;
-
-    const resend = getResend();
-    const result = await resend.emails.send({
-      from: CONTACT_FROM_EMAIL,
+    // Send email
+    await transporter.sendMail({
+      from: `AWERE <${CONTACT_FROM_EMAIL}>`,
       to: CONTACT_TO_EMAIL,
-      subject,
+      replyTo: payload.email,
+      subject: `AWERE contact — ${payload.name}`,
       text: textBody,
     });
 
-    if (result.error) {
-      console.error("Resend error:", result.error);
-      return NextResponse.json(
-        { ok: false, error: "Failed to send email" },
-        { status: 500 }
-      );
-    }
-
     return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error("Contact form error:", error);
+    // Log error without exposing sensitive details
+    console.error("Contact form error:", error instanceof Error ? error.message : "Unknown error");
     return NextResponse.json(
-      { ok: false, error: "Internal server error" },
+      { ok: false, error: "Failed to send message. Please try again later." },
       { status: 500 }
     );
   }
