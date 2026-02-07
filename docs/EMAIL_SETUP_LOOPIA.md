@@ -2,6 +2,26 @@
 
 This guide explains how to configure email delivery for the AWERE contact form using Loopia SMTP.
 
+## Features
+
+The contact form includes:
+
+1. **Email to AWERE team** — Sends notification to `contact@awere.se` with:
+   - User details (name, email, company, website)
+   - Project type and budget range
+   - Full message
+   - Reply-To set to user's email
+
+2. **Autoresponder to user** — Sends confirmation email to the user with:
+   - Subject: "Thanks — we received your message"
+   - Professional acknowledgment
+   - Response time expectation (1-2 business days)
+   - Tips for follow-up information
+
+3. **Rate limiting** — Prevents abuse (5 submissions per IP per 10 minutes)
+
+4. **Input validation** — Ensures data quality and security
+
 ## Prerequisites
 
 - Mailbox already exists: `contact@awere.se` on Loopia

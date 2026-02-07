@@ -158,6 +158,54 @@ Expected: `{"ok":false,"error":"Invalid message (20-4000 characters required)"}`
 
 ## Verify Email Content
 
+When you test the form, you should receive **TWO emails**:
+
+### 1. Notification to AWERE team (`contact@awere.se`)
+
+Check:
+
+1. **From:** `AWERE <contact@awere.se>`
+2. **To:** `contact@awere.se`
+3. **Reply-To:** User's email (e.g., `jane@example.com`)
+4. **Subject:** `AWERE contact — Jane Doe`
+5. **Body includes:**
+   - NAME: Jane Doe
+   - EMAIL: jane@example.com
+   - MESSAGE: (full message)
+   - PROJECT TYPE: SaaS (if provided)
+   - BUDGET RANGE: 50-100k EUR (if provided)
+   - Timestamp
+
+### 2. Autoresponder to user
+
+The user receives a confirmation email:
+
+1. **From:** `AWERE <contact@awere.se>`
+2. **To:** User's email (from form)
+3. **Subject:** `Thanks — we received your message`
+4. **Body:**
+```
+Hi,
+
+Thanks for reaching out to AWERE.
+
+We've received your message and will get back to you as soon as possible (typically within 1–2 business days).
+
+To help us respond efficiently, please include if relevant:
+• What you're building (and where you're stuck)
+• Your current stack (or constraints)
+• Timeline and priorities
+• Links/screenshots (if any)
+
+Best regards,
+AWERE
+contact@awere.se
+
+awere.se
+```
+
+## Verify Email Content (Legacy)
+
 When you receive a test email, check:
 
 1. **From:** `AWERE <contact@awere.se>`

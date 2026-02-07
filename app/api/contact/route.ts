@@ -158,7 +158,7 @@ export async function POST(request: Request) {
       debug: false,
     });
 
-    // Build email body
+    // Build email body for AWERE team
     const textBody = `
 New Contact Form Submission from AWERE
 
@@ -178,13 +178,42 @@ Sent via awere.se/contact
 Timestamp: ${new Date().toISOString()}
 `.trim();
 
-    // Send email
+    // Build autoresponder email for user
+    const autoresponderBody = `
+Hi,
+
+Thanks for reaching out to AWERE.
+
+We've received your message and will get back to you as soon as possible (typically within 1–2 business days).
+
+To help us respond efficiently, please include if relevant:
+• What you're building (and where you're stuck)
+• Your current stack (or constraints)
+• Timeline and priorities
+• Links/screenshots (if any)
+
+Best regards,
+AWERE
+contact@awere.se
+
+awere.se
+`.trim();
+
+    // Send notification email to AWERE team
     await transporter.sendMail({
       from: `AWERE <${CONTACT_FROM_EMAIL}>`,
       to: CONTACT_TO_EMAIL,
       replyTo: payload.email,
       subject: `AWERE contact — ${payload.name}`,
       text: textBody,
+    });
+
+    // Send autoresponder to user
+    await transporter.sendMail({
+      from: `AWERE <${CONTACT_FROM_EMAIL}>`,
+      to: payload.email,
+      subject: "Thanks — we received your message",
+      text: autoresponderBody,
     });
 
     return NextResponse.json({ ok: true });
