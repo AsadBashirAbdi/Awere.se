@@ -15,6 +15,10 @@ export function getWorkItems() {
   return workItems;
 }
 
+export function getWorkItemBySlug(slug: string) {
+  return workItems.find((item) => item.slug === slug);
+}
+
 export function getProcess() {
   return processSteps;
 }
