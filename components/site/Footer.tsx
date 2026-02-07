@@ -3,11 +3,6 @@ import Link from "next/link";
 
 const socialLinks = [
   {
-    name: "LinkedIn",
-    href: "https://linkedin.com/company/awere",
-    icon: "/social/linkedin.svg",
-  },
-  {
     name: "Facebook",
     href: "https://facebook.com/awere",
     icon: "/social/facebook.svg",
@@ -16,6 +11,11 @@ const socialLinks = [
     name: "Instagram",
     href: "https://instagram.com/awere",
     icon: "/social/instagram.svg",
+  },
+  {
+    name: "LinkedIn",
+    href: "https://linkedin.com/company/awere",
+    icon: "/social/linkedin.svg",
   },
   {
     name: "WhatsApp",
