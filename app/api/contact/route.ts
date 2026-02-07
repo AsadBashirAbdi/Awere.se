@@ -16,6 +16,13 @@ function checkRateLimit(key: string): boolean {
   const now = Date.now();
   const record = rateLimitMap.get(key);
 
+  // Clean up expired entries (inline, no setInterval needed)
+  for (const [k, r] of rateLimitMap.entries()) {
+    if (now > r.resetAt) {
+      rateLimitMap.delete(k);
+    }
+  }
+
   if (!record || now > record.resetAt) {
     rateLimitMap.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
     return true;
@@ -28,16 +35,6 @@ function checkRateLimit(key: string): boolean {
   record.count++;
   return true;
 }
-
-// Clean up old entries periodically (simple garbage collection)
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, record] of rateLimitMap.entries()) {
-    if (now > record.resetAt) {
-      rateLimitMap.delete(key);
-    }
-  }
-}, 5 * 60 * 1000); // Every 5 minutes
 
 type ContactPayload = {
   name: string;
